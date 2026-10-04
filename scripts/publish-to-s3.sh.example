@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Manual publish template for beespace.live
+# Copy to publish-to-s3.sh (gitignored), set values, run from repo root.
+#
+#   cp scripts/publish-to-s3.sh.example scripts/publish-to-s3.sh
+#   chmod +x scripts/publish-to-s3.sh
+#   ./scripts/publish-to-s3.sh
+
+set -euo pipefail
+
+BUCKET="${BEESPACE_S3_BUCKET:-YOUR-BUCKET-NAME}"
+DISTRIBUTION_ID="${BEESPACE_CLOUDFRONT_ID:-}"
+AWS_REGION="${AWS_REGION:-us-west-1}"
+
+export AWS_DEFAULT_REGION="$AWS_REGION"
+
+echo "Syncing to s3://${BUCKET}/ ..."
+aws s3 sync . "s3://${BUCKET}/" \
+  --delete \
+  --exclude ".git/*" \
+  --exclude ".github/*" \
+  --exclude ".cursor/*" \
+  --exclude ".DS_Store" \
+  --exclude "README.md" \
+  --exclude "GROKBOT.md" \
+  --exclude "scripts/publish-to-s3.sh" \
+  --exclude "scripts/publish-to-s3.sh.example"
+
+if [[ -n "$DISTRIBUTION_ID" ]]; then
+  echo "Invalidating CloudFront ${DISTRIBUTION_ID} ..."
+  aws cloudfront create-invalidation \
+    --distribution-id "$DISTRIBUTION_ID" \
+    --paths "/*"
+else
+  echo "Skip CloudFront invalidation (set BEESPACE_CLOUDFRONT_ID)."
+fi
+
+echo "Done."

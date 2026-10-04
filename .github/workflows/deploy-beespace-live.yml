@@ -1,0 +1,63 @@
+# Publish static site to the beespace.live S3 bucket + CloudFront.
+# One-time AWS + GitHub secrets setup: see docs/DEPLOY.md
+#
+# Required GitHub repository secrets:
+#   AWS_ROLE_ARN              — IAM role for OIDC (recommended)
+#   AWS_S3_BUCKET             — e.g. beespace.live or your bucket name
+#   CLOUDFRONT_DISTRIBUTION_ID — CloudFront distribution ID (optional but recommended)
+#
+# Optional repository variable (Settings → Secrets and variables → Actions → Variables):
+#   AWS_REGION                — default us-west-1 if unset
+
+name: Publish beespace.live
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: publish-beespace-live
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-west-1' }}
+
+      - name: Sync to S3
+        env:
+          BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        run: |
+          test -n "$BUCKET" || { echo "Missing AWS_S3_BUCKET secret"; exit 1; }
+          aws s3 sync . "s3://${BUCKET}/" \
+            --delete \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude ".cursor/*" \
+            --exclude ".DS_Store" \
+            --exclude "README.md" \
+            --exclude "GROKBOT.md" \
+            --exclude "scripts/publish-to-s3.sh.example"
+
+      - name: Invalidate CloudFront
+        env:
+          DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        if: env.DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/*"

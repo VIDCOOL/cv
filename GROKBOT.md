@@ -12,7 +12,14 @@ Use this document when you maintain **https://beespace.live** via GitHub.
 | **Hosting** | Static files on **Amazon S3**, served through **CloudFront** |
 | **Local path (owner)** | `/Users/leorios/Desktop/BeeSpace/` |
 
-Changes merged to `main` update the public site **only after deploy** (GitHub Actions or manual S3 sync). If the site did not change after your PR merged, say so and check whether deploy ran.
+**Publishing:** Editing GitHub does **not** update the live site by itself. See **[`docs/DEPLOY.md`](docs/DEPLOY.md)** for the full publish pipeline (GitHub Actions → S3 → CloudFront).
+
+| Publish status | What happens when PR merges to `main` |
+|----------------|----------------------------------------|
+| **Not configured** | Only GitHub changes — **beespace.live stays the same** |
+| **Configured** | Workflow [`.github/workflows/deploy-beespace-live.yml`](.github/workflows/deploy-beespace-live.yml) syncs to S3 and invalidates CloudFront |
+
+You **cannot** set up AWS or GitHub secrets. Never ask the user to paste AWS keys in chat. If publish is not configured, say clearly: *“Merged on GitHub; live site will not change until DEPLOY.md setup or manual S3 upload.”*
 
 ---
 
@@ -133,14 +140,16 @@ Never paste AWS keys, Formspree secrets, or deploy credentials into chat logs or
 
 ---
 
-## Deploy (after merge)
+## Publish (after merge) — read this
 
-If **GitHub Actions** deploy workflow exists (`.github/workflows/deploy.yml`):
+1. Check whether `.github/workflows/deploy-beespace-live.yml` exists on `main`.
+2. If **missing** → user must copy it from `docs/DEPLOY.md` instructions; **do not claim the site is updated.**
+3. If **present** → after merge, tell the user to confirm **Actions → Publish beespace.live** succeeded before saying beespace.live is live.
+4. Optional: user can run **workflow_dispatch** manually from the Actions tab without a new commit.
 
-- Merging to `main` should sync to S3 and invalidate CloudFront
-- After merge, confirm the Actions tab shows a successful run before telling the user the site is live
+**Manual fallback (human only):** `scripts/publish-to-s3.sh.example` — user runs AWS CLI on their Mac; you do not run AWS commands unless the user explicitly connects AWS tools with credentials already configured in their environment.
 
-If **no workflow** exists, tell the user: *“Changes are on GitHub; live site needs manual S3 upload or deploy setup.”*
+Full setup: **[`docs/DEPLOY.md`](docs/DEPLOY.md)**
 
 ---
 
